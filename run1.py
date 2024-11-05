@@ -107,13 +107,13 @@ async def handle_grow_and_garden(refresh_token):
                     "operationName": "issueGrowAction"
                 }
                 mine = await send_request(api_url, 'POST', action_query)
-                if mine and mine.get('data', {}).get('issueGrowAction'):
+                if mine and mine.get('data') and mine['data'].get('issueGrowAction'):
                     reward = mine['data']['issueGrowAction']
                     balance += reward
                     grow -= 1
                     print(f"{Fore.GREEN}Rewards: {reward} | Balance: {balance} | Grow left: {grow}{Style.RESET_ALL}")
                 else:
-                    print(f"{Fore.RED}Failed to issue grow action.{Style.RESET_ALL}")
+                    print(f"{Fore.RED}Failed to issue grow action or missing data.{Style.RESET_ALL}")
                     break
 
                 await send_request(api_url, 'POST', {"query": "mutation commitGrowAction { commitGrowAction }", "operationName": "commitGrowAction"})
@@ -125,12 +125,12 @@ async def handle_grow_and_garden(refresh_token):
                     "operationName": "executeGardenRewardAction"
                 }
                 mine_garden = await send_request(api_url, 'POST', garden_action_query)
-                if mine_garden and mine_garden.get('data', {}).get('executeGardenRewardAction'):
+                if mine_garden and mine_garden.get('data') and mine_garden['data'].get('executeGardenRewardAction'):
                     card_ids = [item['cardId'] for item in mine_garden['data']['executeGardenRewardAction']]
                     print(f"{Fore.GREEN}Opened Garden: {card_ids}{Style.RESET_ALL}")
                     garden -= 10
                 else:
-                    print(f"{Fore.RED}Failed to execute garden reward action.{Style.RESET_ALL}")
+                    print(f"{Fore.RED}Failed to execute garden reward action or missing data.{Style.RESET_ALL}")
                     break
     finally:
         loading_task.cancel()
