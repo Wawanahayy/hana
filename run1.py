@@ -32,11 +32,15 @@ async def colay(url, method, payload_data=None):
         try:
             response = await client.request(method, url, headers=headers, json=payload_data)
             if response.status_code != 200:
-                raise Exception(f'HTTP error! Status: {response.status_code}')
+                print(f"{Fore.RED}HTTP error! Status: {response.status_code}{Style.RESET_ALL}")
+                return None  # Mengembalikan None jika ada kesalahan
             return response.json()
         except httpx.ReadTimeout:
             print(f"{Fore.RED}Request timed out. Retrying...{Style.RESET_ALL}")
             return await colay(url, method, payload_data)  # Retry the request
+        except Exception as e:
+            print(f"{Fore.RED}An error occurred: {e}{Style.RESET_ALL}")
+            return None
 
 async def refresh_access_token(refresh_token):
     api_key = "AIzaSyDipzN0VRfTPnMGhQ5PSzO27Cxm3DohJGY"
@@ -47,7 +51,8 @@ async def refresh_access_token(refresh_token):
             data=f'grant_type=refresh_token&refresh_token={refresh_token}'
         )
         if response.status_code != 200:
-            raise Exception("Failed to refresh access token")
+            print(f"{Fore.RED}Failed to refresh access token{Style.RESET_ALL}")
+            return None  # Mengembalikan None jika gagal
         return response.json().get('access_token')
 
 async def loading_with_time():
@@ -56,24 +61,22 @@ async def loading_with_time():
     current_message = random.choice(loading_messages)
 
     while True:
-        # Menghitung jam, menit, dan detik
         hours = duration // 3600
         minutes = (duration % 3600) // 60
         seconds = duration % 60
 
-        # Format waktu
         time_formatted = f"{hours:02}:{minutes:02}:{seconds:02}"
-
-        # Menampilkan indikator loading dengan warna yang berubah-ubah
         color = random.choice(colors)
         print(f"{color}{current_message} {time_formatted}{Style.RESET_ALL}", end='\r')
-        await asyncio.sleep(0.02)  # Delay 20 milidetik
-        duration += 1  # Tambah durasi
-
-    return current_message
+        await asyncio.sleep(0.02)
+        duration += 1
 
 async def handle_grow_and_garden(refresh_token):
     new_access_token = await refresh_access_token(refresh_token)
+    if new_access_token is None:
+        print(f"{Fore.RED}Skipping this token due to access token refresh failure.{Style.RESET_ALL}")
+        return  # Menghentikan eksekusi jika token tidak dapat diperbarui
+
     headers['authorization'] = f'Bearer {new_access_token}'
 
     info_query = {
@@ -81,15 +84,17 @@ async def handle_grow_and_garden(refresh_token):
         "operationName": "CurrentUser"
     }
     
-    loading_task = asyncio.create_task(loading_with_time())  # Memulai loading task
+    loading_task = asyncio.create_task(loading_with_time())
     try:
         info = await colay(api_url, 'POST', info_query)
 
-        # Menampilkan balance
-        if 'data' in info and 'currentUser' in info['data']:
+        if info and 'data' in info and 'currentUser' in info['data']:
             balance = info['data']['currentUser']['totalPoint']
             deposit = info['data']['currentUser']['depositCount']
             print(f"{Fore.GREEN}POINTS: {balance} | Deposit Counts: {deposit}{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.RED}Failed to retrieve user info.{Style.RESET_ALL}")
+            return
 
         bet_query = {
             "query": "query GetGardenForCurrentUser { getGardenForCurrentUser { id inviteCode gardenDepositCount gardenStatus { id activeEpoch growActionCount gardenRewardActionCount } gardenMilestoneRewardInfo { id gardenDepositCountWhenLastCalculated lastAcquiredAt createdAt } gardenMembers { id sub name iconPath depositCount } } }",
@@ -98,7 +103,7 @@ async def handle_grow_and_garden(refresh_token):
         
         profile = await colay(api_url, 'POST', bet_query)
 
-        if 'data' in profile and 'getGardenForCurrentUser' in profile['data']:
+        if profile and 'data' in profile and 'getGardenForCurrentUser' in profile['data']:
             grow = profile['data']['getGardenForCurrentUser']['gardenStatus']['growActionCount']
             garden = profile['data']['getGardenForCurrentUser']['gardenStatus']['gardenRewardActionCount']
 
@@ -124,10 +129,15 @@ async def handle_grow_and_garden(refresh_token):
                     "operationName": "issueGrowAction"
                 }
                 mine = await colay(api_url, 'POST', action_query)
-                reward = mine['data']['issueGrowAction']
-                balance += reward
-                grow -= 1
-                print(f"{Fore.GREEN}Rewards: {reward} | Balance: {balance} | Grow left: {grow}{Style.RESET_ALL}")
+                
+                if mine and 'data' in mine and 'issueGrowAction' in mine['data']:
+                    reward = mine['data']['issueGrowAction']
+                    balance += reward
+                    grow -= 1
+                    print(f"{Fore.GREEN}Rewards: {reward} | Balance: {balance} | Grow left: {grow}{Style.RESET_ALL}")
+                else:
+                    print(f"{Fore.RED}Failed to issue grow action.{Style.RESET_ALL}")
+                    break
 
                 commit_query = {
                     "query": "mutation commitGrowAction { commitGrowAction }",
@@ -142,9 +152,14 @@ async def handle_grow_and_garden(refresh_token):
                     "operationName": "executeGardenRewardAction"
                 }
                 mine_garden = await colay(api_url, 'POST', garden_action_query)
-                card_ids = [item['data']['cardId'] for item in mine_garden['data']['executeGardenRewardAction']]
-                print(f"{Fore.GREEN}Opened Garden: {card_ids}{Style.RESET_ALL}")
-                garden -= 10
+                
+                if mine_garden and 'data' in mine_garden and 'executeGardenRewardAction' in mine_garden['data']:
+                    card_ids = [item['data']['cardId'] for item in mine_garden['data']['executeGardenRewardAction']]
+                    print(f"{Fore.GREEN}Opened Garden: {card_ids}{Style.RESET_ALL}")
+                    garden -= 10
+                else:
+                    print(f"{Fore.RED}Failed to execute garden reward action.{Style.RESET_ALL}")
+                    break
 
     finally:
         loading_task.cancel()  # Menghentikan loading task saat selesai
