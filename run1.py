@@ -6,69 +6,39 @@ import httpx
 import random
 import time
 
-init(autoreset=True)
-
-# Display the JawaPride logo
-os.system("curl -s https://raw.githubusercontent.com/Wawanahayy/JawaPride-all.sh/refs/heads/main/display.sh | bash")
-
-api_url = "https://hanafuda-backend-app-520478841386.us-central1.run.app/graphql"
-
-# Load access tokens
-with open("token.txt", "r") as file:
-    access_tokens = [line.strip() for line in file if line.strip()]
-
-# Load loading messages from file
-with open("loading_messages.txt", "r") as file:
-    loading_messages = [line.strip() for line in file if line.strip()]
-
-headers = {
-    'Accept': '*/*',
-    'Content-Type': 'application/json',
-    'User-Agent': "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
-}
-
-async def send_request(url, method, payload_data=None, retries=3):
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for attempt in range(retries):
-            try:
-                response = await client.request(method, url, headers=headers, json=payload_data)
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPStatusError as e:
-                print(f"{Fore.RED}HTTP error! Status: {e.response.status_code}. Retrying...{Style.RESET_ALL}")
-                await asyncio.sleep(2)
-            except httpx.RequestError as e:
-                print(f"{Fore.RED}Request error: {e}. Retrying...{Style.RESET_ALL}")
-                await asyncio.sleep(2)
+# Fungsi untuk mengirim permintaan HTTP
+async def send_request(url, method, data=None):
+    try:
+        if method == 'POST':
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=data) as response:
+                    return await response.json()
+        # Anda bisa menambahkan metode lain jika diperlukan
+    except Exception as e:
+        print(f"{Fore.RED}Request error: {e}{Style.RESET_ALL}")
         return None
 
+# Fungsi untuk me-refresh token
 async def refresh_access_token(refresh_token):
-    api_key = "AIzaSyDipzN0VRfTPnMGhQ5PSzO27Cxm3DohJGY"
-    data = f'grant_type=refresh_token&refresh_token={refresh_token}'
-    response = await send_request(
-        f'https://securetoken.googleapis.com/v1/token?key={api_key}', 'POST', data
-    )
-    return response.get('access_token') if response else None
+    # Implementasi untuk me-refresh token
+    return "new_access_token"  # Gantilah dengan logika yang sesuai
 
+# Fungsi untuk menunggu dengan loading (contoh placeholder)
 async def loading_with_time():
-    duration = 0
-    colors = [Fore.YELLOW, Fore.CYAN, Fore.MAGENTA, Fore.GREEN, Fore.RED]
-    current_message = random.choice(loading_messages)
-
     while True:
-        time_formatted = time.strftime("%H:%M:%S", time.gmtime(duration))
-        color = random.choice(colors)
-        print(f"{color}{current_message} {time_formatted}{Style.RESET_ALL}", end='\r')
-        await asyncio.sleep(1)
-        duration += 1
+        print(f"{Fore.YELLOW}Loading...{Style.RESET_ALL}")
+        await asyncio.sleep(10)
 
+# Fungsi utama untuk menangani grow dan garden
 async def handle_grow_and_garden(refresh_token):
     new_access_token = await refresh_access_token(refresh_token)
     if not new_access_token:
         print(f"{Fore.RED}Skipping token due to refresh failure.{Style.RESET_ALL}")
         return
 
-    headers['authorization'] = f'Bearer {new_access_token}'
+    headers = {'authorization': f'Bearer {new_access_token}'}
+    api_url = "https://api.example.com"  # Ganti dengan URL API yang sesuai
+    
     info_query = {
         "query": "query CurrentUser { currentUser { id sub name iconPath depositCount totalPoint evmAddress { userId address } inviter { id name } } }",
         "operationName": "CurrentUser"
@@ -107,15 +77,17 @@ async def handle_grow_and_garden(refresh_token):
                     "operationName": "issueGrowAction"
                 }
                 mine = await send_request(api_url, 'POST', action_query)
-                if mine and mine.get('data') and mine['data'].get('issueGrowAction'):
-                    reward = mine['data']['issueGrowAction']
-                    balance += reward
-                    grow -= 1
-                    print(f"{Fore.GREEN}Rewards: {reward} | Balance: {balance} | Grow left: {grow}{Style.RESET_ALL}")
-                else:
-                    print(f"{Fore.RED}Failed to issue grow action or missing data.{Style.RESET_ALL}")
-                    break
-
+                
+                # Skip jika data kosong atau None
+                if not mine or not mine.get('data') or mine['data'].get('issueGrowAction') is None:
+                    print(f"{Fore.RED}Skipping grow action due to missing data.{Style.RESET_ALL}")
+                    await asyncio.sleep(random.randint(1, 3))  # Tunggu 1-3 detik sebelum melanjutkan
+                    continue
+                
+                reward = mine['data']['issueGrowAction']
+                balance += reward
+                grow -= 1
+                print(f"{Fore.GREEN}Rewards: {reward} | Balance: {balance} | Grow left: {grow}{Style.RESET_ALL}")
                 await send_request(api_url, 'POST', {"query": "mutation commitGrowAction { commitGrowAction }", "operationName": "commitGrowAction"})
 
             while garden >= 10:
@@ -125,22 +97,24 @@ async def handle_grow_and_garden(refresh_token):
                     "operationName": "executeGardenRewardAction"
                 }
                 mine_garden = await send_request(api_url, 'POST', garden_action_query)
-                if mine_garden and mine_garden.get('data') and mine_garden['data'].get('executeGardenRewardAction'):
-                    card_ids = [item['cardId'] for item in mine_garden['data']['executeGardenRewardAction']]
-                    print(f"{Fore.GREEN}Opened Garden: {card_ids}{Style.RESET_ALL}")
-                    garden -= 10
-                else:
-                    print(f"{Fore.RED}Failed to execute garden reward action or missing data.{Style.RESET_ALL}")
-                    break
+                
+                # Skip jika data kosong atau None
+                if not mine_garden or not mine_garden.get('data') or mine_garden['data'].get('executeGardenRewardAction') is None:
+                    print(f"{Fore.RED}Skipping garden reward action due to missing data.{Style.RESET_ALL}")
+                    await asyncio.sleep(random.randint(1, 3))  # Tunggu 1-3 detik sebelum melanjutkan
+                    continue
+                
+                card_ids = [item['cardId'] for item in mine_garden['data']['executeGardenRewardAction']]
+                print(f"{Fore.GREEN}Opened Garden: {card_ids}{Style.RESET_ALL}")
+                garden -= 10
     finally:
         loading_task.cancel()
 
+# Menjalankan proses utama
 async def main():
-    while True:
-        for refresh_token in access_tokens:
-            await handle_grow_and_garden(refresh_token)
-        print(f"{Fore.RED}All accounts processed. Cooling down...{Style.RESET_ALL}")
-        await asyncio.sleep(10)
+    refresh_token = "your_refresh_token_here"  # Ganti dengan token refresh yang valid
+    await handle_grow_and_garden(refresh_token)
 
+# Menjalankan event loop
 if __name__ == "__main__":
     asyncio.run(main())
