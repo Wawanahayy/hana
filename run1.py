@@ -10,9 +10,9 @@ import time
 async def send_request(url, method, data=None):
     try:
         if method == 'POST':
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=data) as response:
-                    return await response.json()
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=data)
+                return response.json()
         # Anda bisa menambahkan metode lain jika diperlukan
     except Exception as e:
         print(f"{Fore.RED}Request error: {e}{Style.RESET_ALL}")
