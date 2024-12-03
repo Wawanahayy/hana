@@ -1,2 +1,4 @@
 *.log
 log.txt
+__pycache__
+path/to/logs
