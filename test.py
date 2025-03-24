@@ -139,7 +139,7 @@ class Grows:
         except Exception as e:
             print(f"{color_codes['red']}Error processing account: {e}")
 
-   async def main(self):
+async def main(self):
     print(f"{color_codes['blue']}Waiting for {self.countdown_before_start} seconds before start!")
     print("~" * 65)
 
@@ -161,6 +161,7 @@ class Grows:
 
         # Restart the loop instead of recursive calls
         print(f"{color_codes['yellow']}Restarting tasks...")
+
 
 if __name__ == "__main__":
     # Initial Banner Display
