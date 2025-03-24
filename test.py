@@ -139,35 +139,34 @@ class Grows:
         except Exception as e:
             print(f"{color_codes['red']}Error processing account: {e}")
 
-async def main(self):
-    print(f"{color_codes['blue']}Waiting for {self.countdown_before_start} seconds before start!")
-    print("~" * 65)
 
-    # Countdown timer before the main loop starts
-    await asyncio.sleep(self.countdown_before_start)
+    async def main(self):  # ✅ Ensure this method is inside the class
+        print(f"{color_codes['blue']}Waiting for {self.countdown_before_start} seconds before start!")
+        print("~" * 65)
 
-    while True:  # Keeps running without recursive calls
-        async with aiohttp.ClientSession() as session:
-            tasks = [self.process_account(session, token) for token in self.tokens]
-            await asyncio.gather(*tasks)
+        # Countdown timer before the main loop starts
+        await asyncio.sleep(self.countdown_before_start)
 
-        # Log cooldown time
-        cooldown_hours, cooldown_minutes = divmod(self.cooldown // 60, 60)
-        cooldown_str = f"{cooldown_hours} hours {cooldown_minutes} minutes" if cooldown_hours > 0 else f"{cooldown_minutes} minutes"
-        print(f"{color_codes['green']}Cooldown time: {cooldown_str} / {self.cooldown} seconds!")
+        while True:  # Keeps running without recursion
+            async with aiohttp.ClientSession() as session:
+                tasks = [self.process_account(session, token) for token in self.tokens]
+                await asyncio.gather(*tasks)
 
-        # Countdown for cooldown period
-        await self.countdown_timer(self.cooldown)
+            # Log cooldown time
+            cooldown_hours, cooldown_minutes = divmod(self.cooldown // 60, 60)
+            cooldown_str = f"{cooldown_hours} hours {cooldown_minutes} minutes" if cooldown_hours > 0 else f"{cooldown_minutes} minutes"
+            print(f"{color_codes['green']}Cooldown time: {cooldown_str} / {self.cooldown} seconds!")
 
-        # Restart the loop instead of recursive calls
-        print(f"{color_codes['yellow']}Restarting tasks...")
+            # Countdown for cooldown period
+            await self.countdown_timer(self.cooldown)
 
+            # Restart the loop instead of recursion
+            print(f"{color_codes['yellow']}Restarting tasks...")
 
 if __name__ == "__main__":
-    # Initial Banner Display
     _clear()
     _banner()
 
     token_file = 'token.txt'
-    grows = Grows(token_file)
-    asyncio.run(grows.main())
+    grows = Grows(token_file)  # ✅ Create instance correctly
+    asyncio.run(grows.main())  # ✅ Call the method properly
